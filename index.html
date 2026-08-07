@@ -103,7 +103,7 @@
     .landing-content {
       position: relative;
       z-index: 2;
-      max-width: 720px;
+      max-width: min(1100px, 100%);
     }
 
     .landing-name {
@@ -126,14 +126,15 @@
 
     .landing-quote {
       margin: 22px auto 0;
-      max-width: 28em;
+      max-width: none;
       font-family: "Source Serif 4", Georgia, serif;
       font-optical-sizing: auto;
-      font-size: clamp(26px, 4.2vw, 40px);
+      font-size: clamp(18px, 3.1vw, 40px);
       font-style: normal;
       font-weight: 400;
       line-height: 1.45;
       letter-spacing: -0.01em;
+      white-space: nowrap;
       color: var(--accent-dark);
     }
 
@@ -871,6 +872,13 @@
 
       .eyebrow {
         white-space: normal;
+      }
+
+      .landing-quote {
+        white-space: normal;
+        max-width: 18em;
+        margin-left: auto;
+        margin-right: auto;
       }
 
       .portrait-scene {
