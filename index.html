@@ -252,7 +252,7 @@
       margin: 0 auto;
       padding: 72px 24px 56px;
       display: grid;
-      grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.85fr);
+      grid-template-columns: minmax(0, 1.35fr) minmax(160px, 0.85fr);
       gap: 48px;
       align-items: start;
     }
@@ -866,12 +866,37 @@
       }
 
       .hero-inner {
-        grid-template-columns: 1fr;
-        padding-top: 48px;
+        grid-template-columns: minmax(0, 1.35fr) minmax(108px, 0.55fr);
+        gap: 16px;
+        padding: 48px 16px 40px;
+        align-items: start;
+      }
+
+      .hero-heading {
+        gap: 6px 12px;
       }
 
       .eyebrow {
         white-space: normal;
+        font-size: clamp(10px, 2.8vw, 13px);
+      }
+
+      h1 {
+        font-size: clamp(28px, 8vw, 40px);
+      }
+
+      .hero-affiliation {
+        margin-top: 16px;
+        font-size: 13px;
+      }
+
+      .bio {
+        margin-top: 16px;
+        font-size: 14px;
+      }
+
+      .hero-line {
+        margin-top: 16px;
       }
 
       .landing-quote {
@@ -882,8 +907,26 @@
       }
 
       .portrait-scene {
-        max-width: 340px;
-        margin: 0 auto;
+        max-width: 150px;
+        margin: 0 0 0 auto;
+        padding: 0;
+      }
+
+      .portrait {
+        border-radius: 6px;
+        box-shadow:
+          0 12px 28px rgba(31, 41, 51, 0.14),
+          0 4px 10px rgba(31, 41, 51, 0.06);
+      }
+
+      .portrait-chip {
+        font-size: 9px;
+        padding: 4px 7px;
+      }
+
+      .portrait-chip.c2 {
+        right: 8px;
+        bottom: 10px;
       }
 
       .placeholder-box {
