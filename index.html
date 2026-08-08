@@ -70,13 +70,48 @@
       position: fixed;
       inset: 0;
       z-index: 0;
-      pointer-events: none;
+      /* Receive taps on empty background; pan-y keeps page scrolling */
+      pointer-events: auto;
+      touch-action: pan-y;
     }
 
     #particles-js canvas {
       display: block;
       width: 100% !important;
       height: 100% !important;
+      touch-action: pan-y;
+    }
+
+    /* Layout shells let touches fall through to particles */
+    .landing,
+    #site,
+    main,
+    footer,
+    .hero,
+    section,
+    .band,
+    .band-inner,
+    .hero-inner {
+      pointer-events: none;
+    }
+
+    /* Content panels stay tappable / scrollable as normal */
+    .site-header,
+    .music-toggle,
+    .landing-content,
+    .hero-copy,
+    .portrait-scene,
+    section > .section-title,
+    section > .section-intro,
+    section > .grid,
+    section > .paper-filters,
+    section > .paper-list,
+    section > .presentation-list,
+    .band-inner > .section-title,
+    .band-inner > .section-intro,
+    .band-inner > .grid,
+    footer > * {
+      pointer-events: auto;
     }
 
     main,
@@ -1514,7 +1549,7 @@
             }
           },
           interactivity: {
-            detect_on: "window",
+            detect_on: "canvas",
             events: {
               onhover: { enable: true, mode: "repulse" },
               onclick: { enable: true, mode: "push" },
