@@ -104,7 +104,7 @@ export function createPrPlot(container, onHover, onSelect) {
     pointerDown: null,
     hideEnded: false,
     minFreq: 1,
-    showAxes: true,
+    showAxes: false,
   };
 
   const raycaster = new THREE.Raycaster();
