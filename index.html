@@ -786,11 +786,16 @@
     .resource-link {
       display: inline-flex;
       align-items: center;
-      margin-top: 14px;
+      margin-top: 0;
       color: var(--accent-dark);
-      font-size: 14px;
+      font-size: 16px;
       font-weight: 700;
       text-decoration: none;
+    }
+
+    .resource-link:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
     }
 
     .personal-band {
@@ -1480,6 +1485,9 @@
 
     <section id="behind-the-scenes">
       <h2 class="section-title">OSS development dynamics</h2>
+      <p class="section-intro">
+        <a class="resource-link" href="https://emeet-li.github.io/3Dprocess/" target="_blank" rel="noopener noreferrer">Play with it</a>
+      </p>
       <div class="video-embed">
         <video controls playsinline muted preload="metadata" src="assets/videos/oss-behind-the-scenes.mp4">
           Your browser does not support the video tag.
