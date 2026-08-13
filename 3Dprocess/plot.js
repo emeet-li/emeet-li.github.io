@@ -58,6 +58,7 @@ export function createPrPlot(container, onHover, onSelect) {
   controls.target.set(0, TIME_H * 0.45, 0);
 
   const axesGroup = new THREE.Group();
+  axesGroup.visible = false;
   scene.add(axesGroup);
   axesGroup.add(new THREE.GridHelper(1200, 40, 0x111111, 0x080808));
   axesGroup.add(new THREE.AxesHelper(400));
