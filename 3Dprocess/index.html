@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PR Trace Map</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="plot"></div>
+
+  <div id="overlay">
+    <div class="row">
+      <label class="file-btn" for="csv-file">Upload CSV</label>
+      <input id="csv-file" type="file" accept=".csv,text/csv,text/plain" />
+      <button type="button" id="load-sample">Load Sample</button>
+    </div>
+    <div id="hint">Each PR is a process sequence. 2D distance is MDS of process distance. Time is vertical. After Start, click a point to see its PR ID and event sequence.</div>
+
+    <div class="row play-row">
+      <button type="button" id="play" disabled>Start</button>
+      <button type="button" id="stop" disabled>Stop</button>
+      <button type="button" id="reset" disabled>Reset</button>
+    </div>
+    <div id="timer">
+      <div class="timer-label">Time</div>
+      <div class="timer-value" id="timer-value">—</div>
+      <div class="timer-span" id="timer-span"></div>
+    </div>
+
+    <div class="controls">
+      <label class="check"><input id="github-pr" type="checkbox" /> GitHub PR timeline</label>
+      <label>Entity <select id="entity-col"></select></label>
+      <label>Event <select id="pattern-col"></select></label>
+      <label>Transitions
+        <select id="direction">
+          <option value="directed" selected>directed</option>
+          <option value="bidirected">bidirected</option>
+        </select>
+      </label>
+      <label>Process distance
+        <select id="distance-mode">
+          <option value="both" selected>sequence + transitions</option>
+          <option value="sequence">sequence edit</option>
+          <option value="transition">transition profile</option>
+        </select>
+      </label>
+      <label>Color
+        <select id="color-mode">
+          <option value="created" selected>created time</option>
+          <option value="outcome">outcome</option>
+        </select>
+      </label>
+      <div id="color-legend" hidden>
+        <div class="legend-item"><span class="swatch" style="background:#00ffff"></span> merged</div>
+        <div class="legend-item"><span class="swatch" style="background:#ff66cc"></span> closed</div>
+        <div class="legend-item"><span class="swatch" style="background:#ffaa33"></span> deleted</div>
+        <div class="legend-item"><span class="swatch" style="background:#88ff66"></span> open</div>
+      </div>
+      <label>Duration <input id="duration" type="range" min="8" max="60" step="1" value="24" /> <span id="duration-value">24s</span></label>
+      <label class="check"><input id="hide-ended" type="checkbox" /> Hide ended traces</label>
+      <label class="check"><input id="show-axes" type="checkbox" checked /> Show X Y Z axes</label>
+      <div id="freq-filter">
+        <label>Min frequency
+          <input id="min-freq" type="range" min="1" max="2" step="1" value="1" />
+          <span id="min-freq-value">1+ all</span>
+        </label>
+        <div class="freq-hint">Same event sequence must appear at least this many times. Raise to see only recurrent processes.</div>
+      </div>
+    </div>
+
+    <div id="metrics">
+      <div class="metric">Status: <span class="val" id="status">No CSV loaded</span></div>
+      <div class="metric">Repo: <span class="val" id="m-repo">—</span></div>
+      <div class="metric">Time: <span class="val" id="m-clock">—</span></div>
+      <div class="metric">Rows: <span class="val" id="m-rows">—</span></div>
+      <div class="metric">PRs: <span class="val" id="m-prs">—</span></div>
+      <div class="metric">Visible: <span class="val" id="m-visible">—</span></div>
+      <div class="metric">Recurrent: <span class="val" id="m-recurrent">—</span></div>
+      <div class="metric">2D stress: <span class="val" id="m-stress">—</span></div>
+      <div class="metric">Hover: <span class="val" id="m-hover">Click a point for PR ID and sequence</span></div>
+    </div>
+  </div>
+
+  <aside id="pr-detail" hidden>
+    <div class="detail-head">
+      <div>
+        <div class="detail-kicker">Selected PR</div>
+        <div class="detail-id" id="detail-id">—</div>
+      </div>
+      <button type="button" id="detail-close">Close</button>
+    </div>
+    <div class="detail-meta" id="detail-meta"></div>
+    <div class="detail-kicker">Sequence</div>
+    <ol class="detail-seq" id="detail-seq"></ol>
+  </aside>
+
+  <div id="labels-hud">
+    X: MDS1 · PROCESS DISTANCE<br />
+    Z: MDS2 · PROCESS DISTANCE<br />
+    Y: TIME BY MONTH · APPEAR AT CREATED, TRACE TO CLOSE
+  </div>
+
+  <footer id="site-footer">
+    <div class="footer-title">Contact</div>
+    <div class="footer-name">Li Zhang</div>
+    <div class="footer-lines">
+      <a href="mailto:zhan2070@msu.edu">zhan2070@msu.edu</a>
+      <a href="https://www.linkedin.com/in/li-z-6757a1256/" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+      <span>East Lansing, MI</span>
+    </div>
+  </footer>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
