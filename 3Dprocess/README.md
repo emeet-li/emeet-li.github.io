@@ -21,5 +21,6 @@ Color is creation time, or outcome (merged / closed / deleted / open).
 
 ## Aknowledgement
 
-The webpage style follows https://github.com/DostoevskysPiano/bird-song
+1. The webpage's 3D style refers to https://github.com/DostoevskysPiano/bird-song
+2. The project is vibe coded, where I describe what I want and AI implements. 
 
