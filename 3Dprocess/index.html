@@ -47,19 +47,60 @@
       </label>
       <label>Color
         <select id="color-mode">
-          <option value="created" selected>created time</option>
-          <option value="outcome">outcome</option>
+          <option value="created">created time</option>
+          <option value="outcome" selected>outcome</option>
+          <option value="pull_request">pull request?</option>
         </select>
       </label>
       <div id="color-legend" hidden>
-        <div class="legend-item"><span class="swatch" style="background:#00ffff"></span> merged</div>
-        <div class="legend-item"><span class="swatch" style="background:#ff66cc"></span> closed</div>
-        <div class="legend-item"><span class="swatch" style="background:#ffaa33"></span> deleted</div>
-        <div class="legend-item"><span class="swatch" style="background:#88ff66"></span> open</div>
+        <div class="legend-outcome">
+          <div class="legend-item"><span class="swatch" style="background:#00ffff"></span> merged</div>
+          <div class="legend-item"><span class="swatch" style="background:#ff66cc"></span> closed</div>
+          <div class="legend-item"><span class="swatch" style="background:#ffaa33"></span> deleted</div>
+          <div class="legend-item"><span class="swatch" style="background:#88ff66"></span> open</div>
+        </div>
+        <div class="legend-pr" hidden>
+          <div class="legend-item"><span class="swatch" style="background:#00ffff"></span> pull request</div>
+          <div class="legend-item"><span class="swatch" style="background:#ff88aa"></span> issue / not PR</div>
+        </div>
+      </div>
+      <div class="legend-item ai-legend"><span class="swatch ai-spark"></span> AI spark</div>
+      <label>Show
+        <select id="entity-type">
+          <option value="both" selected>PR + issue</option>
+          <option value="pull_request">pull request only</option>
+          <option value="issue">issue only</option>
+        </select>
+      </label>
+      <label>AI involvement
+        <select id="ai-filter">
+          <option value="all" selected>all PRs</option>
+          <option value="ai">AI agent involved</option>
+          <option value="no_ai">no AI agent</option>
+        </select>
+      </label>
+      <label>View
+        <select id="view-mode">
+          <option value="traces" selected>PR traces</option>
+          <option value="ai_landscape">AI before / after landscapes</option>
+        </select>
+      </label>
+      <div id="landscape-controls" hidden>
+        <label>Landscape
+          <select id="landscape-show">
+            <option value="both" selected>before + after</option>
+            <option value="before">before AI only</option>
+            <option value="after">after AI only</option>
+          </select>
+        </label>
+        <div class="freq-hint">Manifolds are built only from the traces allowed by Show (PR / issue / both). Dots drop and push valleys deeper when a process repeats. Press Start to replay.</div>
       </div>
       <label>Duration <input id="duration" type="range" min="8" max="60" step="1" value="24" /> <span id="duration-value">24s</span></label>
       <label class="check"><input id="hide-ended" type="checkbox" /> Hide ended traces</label>
       <label class="check"><input id="show-axes" type="checkbox" /> Show X Y Z axes</label>
+      <label class="check"><input id="show-time" type="checkbox" checked /> Show time</label>
+      <label class="check"><input id="show-ai" type="checkbox" checked /> Show AI marks</label>
+      <label class="check"><input id="auto-rotate" type="checkbox" checked /> Auto rotate</label>
       <div id="freq-filter">
         <label>Min frequency
           <input id="min-freq" type="range" min="1" max="2" step="1" value="1" />
@@ -77,6 +118,8 @@
       <div class="metric">PRs: <span class="val" id="m-prs">—</span></div>
       <div class="metric">Visible: <span class="val" id="m-visible">—</span></div>
       <div class="metric">Recurrent: <span class="val" id="m-recurrent">—</span></div>
+      <div class="metric">AI marks: <span class="val" id="m-ai">—</span></div>
+      <div class="metric">Landscapes: <span class="val" id="m-landscape">—</span></div>
       <div class="metric">2D stress: <span class="val" id="m-stress">—</span></div>
       <div class="metric">Hover: <span class="val" id="m-hover">Click a point for PR ID and sequence</span></div>
     </div>
@@ -95,10 +138,23 @@
     <ol class="detail-seq" id="detail-seq"></ol>
   </aside>
 
+  <div id="view-title" hidden></div>
+
   <div id="labels-hud">
     X: MDS1 · PROCESS DISTANCE<br />
     Z: MDS2 · PROCESS DISTANCE<br />
     Y: TIME BY MONTH · APPEAR AT CREATED, TRACE TO CLOSE
+  </div>
+
+  <div id="landscape-hud" hidden>
+    <div class="land-hud-item before" id="land-hud-before">
+      <div class="land-hud-kicker">Upper manifold</div>
+      <div class="land-hud-title">Before AI agent</div>
+    </div>
+    <div class="land-hud-item after" id="land-hud-after">
+      <div class="land-hud-kicker">Lower manifold</div>
+      <div class="land-hud-title">After AI agent</div>
+    </div>
   </div>
 
   <footer id="site-footer">

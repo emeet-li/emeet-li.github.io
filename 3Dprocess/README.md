@@ -18,9 +18,3 @@ Open http://localhost:8001/
 3. Press **Start**. Dots appear at creation time and grow upward until the PR ends.
 
 Color is creation time, or outcome (merged / closed / deleted / open).
-
-## Aknowledgement
-
-1. The webpage's 3D style refers to https://github.com/DostoevskysPiano/bird-song
-2. The project is vibe coded, where I describe what I want and AI implements. 
-

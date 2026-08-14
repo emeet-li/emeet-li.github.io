@@ -21,11 +21,21 @@ const els = {
   duration: document.getElementById("duration"),
   durationValue: document.getElementById("duration-value"),
   hideEnded: document.getElementById("hide-ended"),
+  entityType: document.getElementById("entity-type"),
+  aiFilter: document.getElementById("ai-filter"),
+  viewMode: document.getElementById("view-mode"),
+  landscapeControls: document.getElementById("landscape-controls"),
+  landscapeShow: document.getElementById("landscape-show"),
+  landscapeMetric: document.getElementById("m-landscape"),
   showAxes: document.getElementById("show-axes"),
+  showTime: document.getElementById("show-time"),
+  showAi: document.getElementById("show-ai"),
+  autoRotate: document.getElementById("auto-rotate"),
   freqFilter: document.getElementById("freq-filter"),
   minFreq: document.getElementById("min-freq"),
   minFreqValue: document.getElementById("min-freq-value"),
   recurrent: document.getElementById("m-recurrent"),
+  aiMarks: document.getElementById("m-ai"),
   play: document.getElementById("play"),
   stop: document.getElementById("stop"),
   reset: document.getElementById("reset"),
@@ -77,11 +87,17 @@ function showPrDetail(pr) {
   els.detailId.textContent = `PR #${pr.id}`;
   els.detailMeta.textContent = [
     pr.repo || "unknown repo",
+    pr.isPullRequest ? "pull request" : "issue / not PR",
     pr.outcome,
-    `${pr.nEvents} events`,
-    pr.freq > 1 ? `process seen ${pr.freq} times` : "unique process",
+    pr.aiAppearTs != null
+      ? `AI ${pr.aiAgent || "agent"} @ ${formatTimestamp(pr.aiAppearTs)}`
+      : null,
+    pr.phase ? `${pr.phase} AI landscape` : null,
+    pr.freq > 1 ? `process ×${pr.freq}` : null,
+    `${pr.nEvents || (pr.sequence ? String(pr.sequence).split(" → ").length : 0)} events`,
+    pr.freq > 1 && !pr.phase ? `process seen ${pr.freq} times` : (!pr.phase ? "unique process" : null),
     `${formatTimestamp(pr.startTs)} → ${formatTimestamp(pr.endTs)}`,
-  ].join(" · ");
+  ].filter(Boolean).join(" · ");
   els.detailSeq.innerHTML = steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("");
 }
 
@@ -100,7 +116,8 @@ const plot = createPrPlot(
       return;
     }
     const freqBit = pr.freq > 1 ? ` · ×${pr.freq}` : "";
-    els.hover.textContent = `${pr.repo ? pr.repo + " · " : ""}PR #${pr.id}${freqBit} · click to open sequence`;
+    const aiBit = pr.aiAppearTs != null ? ` · AI ${pr.aiAgent || "agent"}` : "";
+    els.hover.textContent = `${pr.repo ? pr.repo + " · " : ""}PR #${pr.id}${freqBit}${aiBit} · click to open sequence`;
   },
   showPrDetail
 );
@@ -118,6 +135,7 @@ function setStatus(text) {
 
 function canResume() {
   if (!state.result) return false;
+  if (currentViewMode() === "ai_landscape") return false;
   if (plot.isPlaying()) return false;
   const now = plot.getNow();
   return now != null && now >= state.result.tMin && now < state.result.tMax;
@@ -148,14 +166,78 @@ function currentMinFreq() {
   return Number(els.minFreq && els.minFreq.value) || 1;
 }
 
+function currentEntityType() {
+  return (els.entityType && els.entityType.value) || "both";
+}
+
+function currentAiFilter() {
+  return (els.aiFilter && els.aiFilter.value) || "all";
+}
+
+function currentViewMode() {
+  return (els.viewMode && els.viewMode.value) || "traces";
+}
+
+function currentLandscapeShow() {
+  return (els.landscapeShow && els.landscapeShow.value) || "both";
+}
+
+function entityViewLabel() {
+  const t = currentEntityType();
+  if (t === "pull_request") return "Pull request only";
+  if (t === "issue") return "Issue only";
+  return "PR + issue";
+}
+
+function syncViewTitle() {
+  const el = document.getElementById("view-title");
+  if (!el) return;
+  const landscape = currentViewMode() === "ai_landscape";
+  const scope = entityViewLabel();
+  if (landscape) {
+    el.hidden = false;
+    el.textContent = `Landscape: ${scope}`;
+    return;
+  }
+  // In traces view, highlight when filtered away from "both"
+  if (currentEntityType() !== "both") {
+    el.hidden = false;
+    el.textContent = scope;
+    return;
+  }
+  el.hidden = true;
+  el.textContent = "";
+}
+
+function syncLandscapeControls() {
+  const on = currentViewMode() === "ai_landscape";
+  if (els.landscapeControls) els.landscapeControls.hidden = !on;
+  const hud = document.getElementById("landscape-hud");
+  const before = document.getElementById("land-hud-before");
+  const after = document.getElementById("land-hud-after");
+  if (hud) hud.hidden = !on;
+  syncViewTitle();
+  if (!on) return;
+  const show = currentLandscapeShow();
+  if (before) before.hidden = !(show === "both" || show === "before");
+  if (after) after.hidden = !(show === "both" || show === "after");
+}
+
 function visibleCount(result, now) {
   if (!result || now == null) return 0;
   const hideEnded = els.hideEnded && els.hideEnded.checked;
   const minFreq = currentMinFreq();
+  const entityType = currentEntityType();
+  const aiFilter = currentAiFilter();
   return result.traces.filter((t) => {
     if (now < t.startTs) return false;
     if (hideEnded && t.outcome !== "open" && now >= t.endTs) return false;
     if (!hideEnded && (t.freq || 1) < minFreq) return false;
+    if (entityType === "pull_request" && !t.isPullRequest) return false;
+    if (entityType === "issue" && t.isPullRequest) return false;
+    const hasAi = t.aiAppearTs != null;
+    if (aiFilter === "ai" && !hasAi) return false;
+    if (aiFilter === "no_ai" && hasAi) return false;
     return true;
   }).length;
 }
@@ -179,6 +261,8 @@ function renderMetrics() {
     if (els.timerSpan) els.timerSpan.textContent = "";
     if (els.repo) els.repo.textContent = "—";
     if (els.recurrent) els.recurrent.textContent = "—";
+    if (els.aiMarks) els.aiMarks.textContent = "—";
+    if (els.landscapeMetric) els.landscapeMetric.textContent = "—";
     return;
   }
   const { nPrs, tMin, tMax, stress, meanAbsError, repos } = state.result;
@@ -199,6 +283,25 @@ function renderMetrics() {
     els.recurrent.textContent = nProc
       ? `${nProc} processes · ${nPrsR} PRs · max ×${maxF}`
       : `none · max ×${maxF}`;
+  }
+  if (els.aiMarks) {
+    els.aiMarks.textContent = String(state.result.nAiPrs || 0);
+  }
+  if (els.landscapeMetric) {
+    const lands = (plot.getActiveLandscapes && plot.getActiveLandscapes()) || state.result.landscapes;
+    if (!lands) els.landscapeMetric.textContent = "—";
+    else {
+      const nb = (lands.before && lands.before.points && lands.before.points.length) || 0;
+      const na = (lands.after && lands.after.points && lands.after.points.length) || 0;
+      const fb = (lands.before && lands.before.maxFreq) || 1;
+      const fa = (lands.after && lands.after.maxFreq) || 1;
+      const scope = currentEntityType() === "pull_request"
+        ? "PR only"
+        : currentEntityType() === "issue"
+          ? "issue only"
+          : "PR+issue";
+      els.landscapeMetric.textContent = `${scope} · before ${nb} pts · after ${na} pts · max ×${Math.max(fb, fa)}`;
+    }
   }
   els.stress.textContent = `${(stress * 100).toFixed(1)}%  ·  mean |Δ| ${(meanAbsError || 0).toFixed(3)}`;
   const stamp = now == null || now < tMin ? "before start" : formatTimestamp(now);
@@ -252,6 +355,7 @@ async function embedNow() {
       githubPr: els.githubPr.checked,
       distanceMode: els.distanceMode.value,
       repoCol: state.data.repoCol,
+      isPrCol: state.data.isPrCol,
     });
     if (els.minFreq) {
       const maxF = Math.max(state.result.maxFreq || 1, 1);
@@ -264,14 +368,28 @@ async function embedNow() {
       durationSec: Number(els.duration.value),
       hideEnded: els.hideEnded.checked,
       minFreq: currentMinFreq(),
+      entityType: currentEntityType(),
+      aiFilter: currentAiFilter(),
+      viewMode: currentViewMode(),
+      landscapeShow: currentLandscapeShow(),
       showAxes: !els.showAxes || els.showAxes.checked,
+      showTime: !els.showTime || els.showTime.checked,
+      showAiMarks: !!(els.showAi && els.showAi.checked),
+      autoRotate: !els.autoRotate || els.autoRotate.checked,
     });
     setPlayEnabled(true);
     renderMetrics();
     const repoBit = state.result.repos && state.result.repos.length === 1
       ? `${state.result.repos[0]} · `
       : "";
-    setStatus(`${repoBit}${state.result.nPrs} PRs embedded · traces shown · Start replays`);
+    const aiBit = state.result.nAiPrs
+      ? ` · ${state.result.nAiPrs} AI marks`
+      : "";
+    const land = state.result.landscapes;
+    const landBit = land && (land.before.nodes.length || land.after.nodes.length)
+      ? ` · landscapes ready`
+      : "";
+    setStatus(`${repoBit}${state.result.nPrs} PRs embedded${aiBit}${landBit} · traces shown · Start replays`);
   } catch (err) {
     state.result = null;
     plot.render(null);
@@ -303,7 +421,10 @@ els.loadSample.addEventListener("click", async () => {
 
 els.play.addEventListener("click", () => {
   plot.setOptions({ durationSec: Number(els.duration.value) });
-  if (canResume()) {
+  if (currentViewMode() === "ai_landscape") {
+    plot.play();
+    setStatus("Deforming · dots drop and push the manifold");
+  } else if (canResume()) {
     plot.resume();
     setStatus("Continuing traces");
   } else {
@@ -315,13 +436,13 @@ els.play.addEventListener("click", () => {
 els.stop.addEventListener("click", () => {
   plot.stop();
   syncPlayButtons();
-  setStatus("Paused · press Continue");
+  setStatus(currentViewMode() === "ai_landscape" ? "Paused deform · press Start" : "Paused · press Continue");
 });
 els.reset.addEventListener("click", () => {
   plot.reset();
   syncPlayButtons();
   renderMetrics();
-  setStatus("Reset · press Start");
+  setStatus(currentViewMode() === "ai_landscape" ? "Reset landscape · press Start" : "Reset · press Start");
 });
 
 els.duration.addEventListener("input", () => {
@@ -330,7 +451,13 @@ els.duration.addEventListener("input", () => {
 });
 function syncColorLegend() {
   if (!els.colorLegend) return;
-  els.colorLegend.hidden = els.colorMode.value !== "outcome";
+  const mode = els.colorMode.value;
+  const show = mode === "outcome" || mode === "pull_request";
+  els.colorLegend.hidden = !show;
+  const outcome = els.colorLegend.querySelector(".legend-outcome");
+  const pr = els.colorLegend.querySelector(".legend-pr");
+  if (outcome) outcome.hidden = mode !== "outcome";
+  if (pr) pr.hidden = mode !== "pull_request";
 }
 
 els.colorMode.addEventListener("change", () => {
@@ -350,11 +477,54 @@ els.showAxes.addEventListener("change", () => {
   syncAxesHud();
 });
 syncAxesHud();
+els.showTime.addEventListener("change", () => {
+  plot.setOptions({ showTime: els.showTime.checked });
+});
+plot.setOptions({ showTime: !els.showTime || els.showTime.checked });
+function syncAiLegend() {
+  const legend = document.querySelector(".ai-legend");
+  if (legend) legend.hidden = !(els.showAi && els.showAi.checked);
+}
+
+els.showAi.addEventListener("change", () => {
+  plot.setOptions({ showAiMarks: els.showAi.checked });
+  syncAiLegend();
+});
+syncAiLegend();
+plot.setOptions({ showAiMarks: !!(els.showAi && els.showAi.checked) });
+els.autoRotate.addEventListener("change", () => {
+  plot.setOptions({ autoRotate: els.autoRotate.checked });
+});
+plot.setOptions({ autoRotate: !els.autoRotate || els.autoRotate.checked });
 els.hideEnded.addEventListener("change", () => {
   syncFreqFilter();
   plot.setOptions({ hideEnded: els.hideEnded.checked, minFreq: currentMinFreq() });
   renderMetrics();
 });
+els.entityType.addEventListener("change", () => {
+  plot.setOptions({ entityType: currentEntityType() });
+  syncViewTitle();
+  renderMetrics();
+});
+els.aiFilter.addEventListener("change", () => {
+  plot.setOptions({ aiFilter: currentAiFilter() });
+  renderMetrics();
+});
+els.viewMode.addEventListener("change", () => {
+  syncLandscapeControls();
+  plot.setOptions({ viewMode: currentViewMode(), landscapeShow: currentLandscapeShow() });
+  renderMetrics();
+  setStatus(
+    currentViewMode() === "ai_landscape"
+      ? "Deforming landscapes · dots drop and push valleys deeper · Start replays"
+      : "PR traces view"
+  );
+});
+els.landscapeShow.addEventListener("change", () => {
+  plot.setOptions({ landscapeShow: currentLandscapeShow() });
+  syncLandscapeControls();
+});
+syncLandscapeControls();
 els.minFreq.addEventListener("input", () => {
   syncFreqFilter();
   plot.setOptions({ minFreq: currentMinFreq() });

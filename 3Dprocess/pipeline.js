@@ -19,6 +19,49 @@ const PATTERN_NAME_HINTS = [
 const REPO_NAME_HINTS = [
   "repo_fullname", "repo", "repository", "repo_name", "full_name",
 ];
+const IS_PR_HINTS = [
+  "is_pull_request", "is_pr", "pull_request", "isPullRequest",
+];
+const AI_PARTICIPATION_HINTS = [
+  "ai_agent_participation", "ai_participation", "has_ai_agent",
+];
+const AI_AGENT_HINTS = [
+  "ai_agent", "agent", "ai_agent_name",
+];
+const USERNAME_HINTS = [
+  "username", "user", "actor", "author", "login",
+];
+const USERTYPE_HINTS = [
+  "usertype", "user_type", "author_type",
+];
+const AI_USER_PATTERNS = [
+  "devin-ai",
+  "devin-ai-integration",
+  "cursor[bot]",
+  "copilot",
+  "swe-agent",
+  "openhands",
+  "aider",
+  "claude",
+  "chatgpt",
+  "codex",
+  "gemini-code",
+  "anthropic",
+];
+const PR_SIGNAL_EVENTS = new Set([
+  "merged",
+  "review_requested",
+  "reviewed",
+  "review_dismissed",
+  "review_request_removed",
+  "ready_for_review",
+  "convert_to_draft",
+  "head_ref_deleted",
+  "head_ref_force_pushed",
+  "head_ref_restored",
+  "base_ref_changed",
+  "base_ref_force_pushed",
+]);
 
 function parseCSV(text) {
   const rows = [];
@@ -108,6 +151,62 @@ function detectRepoColumn(headers) {
   return REPO_NAME_HINTS.find((h) => headers.includes(h)) || null;
 }
 
+function detectIsPrColumn(headers) {
+  return IS_PR_HINTS.find((h) => headers.includes(h)) || null;
+}
+
+function detectColumn(headers, hints) {
+  return hints.find((h) => headers.includes(h)) || null;
+}
+
+function looksLikeAiUsername(username, agentName) {
+  const u = String(username || "").trim().toLowerCase();
+  if (!u) return false;
+  if (agentName) {
+    const a = String(agentName).trim().toLowerCase();
+    if (a && u.includes(a)) return true;
+  }
+  return AI_USER_PATTERNS.some((p) => u.includes(p));
+}
+
+function inferAiAppearance(rows) {
+  const agentName = rows.map((r) => r.aiAgent).find((v) => v) || "";
+  const flagged = rows.some((r) => r.aiParticipation === true) || Boolean(agentName);
+  if (!flagged && !rows.some((r) => looksLikeAiUsername(r.username, agentName))) {
+    return { aiAgent: "", aiAppearTs: null };
+  }
+  const hit = rows.find((r) => looksLikeAiUsername(r.username, agentName));
+  if (hit) {
+    return {
+      aiAgent: agentName || hit.username,
+      aiAppearTs: hit.ts.getTime(),
+    };
+  }
+  // Fallback: first bot-typed event on an AI-flagged PR
+  if (flagged) {
+    const bot = rows.find((r) => String(r.userType || "").toLowerCase() === "bot");
+    if (bot) {
+      return { aiAgent: agentName || bot.username || "AI agent", aiAppearTs: bot.ts.getTime() };
+    }
+  }
+  return { aiAgent: agentName || "", aiAppearTs: null };
+}
+
+function parseBoolish(value) {
+  if (typeof value === "boolean") return value;
+  const s = String(value ?? "").trim().toLowerCase();
+  if (!s || s === "na" || s === "nan" || s === "null" || s === "none") return null;
+  if (["1", "true", "t", "yes", "y"].includes(s)) return true;
+  if (["0", "false", "f", "no", "n"].includes(s)) return false;
+  return null;
+}
+
+function inferIsPullRequest(rows) {
+  const flagged = rows.map((r) => r.isPullRequest).filter((v) => v != null);
+  if (flagged.length) return flagged.some(Boolean);
+  return rows.some((r) => PR_SIGNAL_EVENTS.has(r.event || r.pattern));
+}
+
 function looksLikeGithubPr(headers, records) {
   return headers.includes("pr_number") &&
     Boolean(headers.includes("event") || headers.includes("events")) &&
@@ -148,6 +247,11 @@ function inspectData(parsed) {
   const entityCol = detectEntityColumn(headers, githubPr);
   const patternCol = detectPatternColumn(headers, timeCol);
   const repoCol = detectRepoColumn(headers);
+  const isPrCol = detectIsPrColumn(headers);
+  const aiParticipationCol = detectColumn(headers, AI_PARTICIPATION_HINTS);
+  const aiAgentCol = detectColumn(headers, AI_AGENT_HINTS);
+  const usernameCol = detectColumn(headers, USERNAME_HINTS);
+  const userTypeCol = detectColumn(headers, USERTYPE_HINTS);
   const patternChoices = headers.filter((h) => h !== timeCol);
   const repos = new Set();
   if (repoCol) {
@@ -164,6 +268,9 @@ function inspectData(parsed) {
     entityCol,
     patternCol,
     repoCol,
+    isPrCol,
+    aiParticipationCol,
+    aiAgentCol,
     repos: [...repos],
     patternChoices,
     entityChoices: headers.filter((h) => h !== timeCol),
@@ -175,6 +282,11 @@ function parseEventRows(records, headers, options) {
   const entityCol = options.entityCol || detectEntityColumn(headers, options.githubPr);
   const patternCol = options.patternCol;
   const repoCol = options.repoCol || detectRepoColumn(headers);
+  const isPrCol = options.isPrCol || detectIsPrColumn(headers);
+  const aiParticipationCol = options.aiParticipationCol || detectColumn(headers, AI_PARTICIPATION_HINTS);
+  const aiAgentCol = options.aiAgentCol || detectColumn(headers, AI_AGENT_HINTS);
+  const usernameCol = options.usernameCol || detectColumn(headers, USERNAME_HINTS);
+  const userTypeCol = options.userTypeCol || detectColumn(headers, USERTYPE_HINTS);
   if (!timeCol) throw new Error("No date/time column found in the CSV.");
   if (!patternCol) throw new Error("Choose an event / pattern column.");
 
@@ -186,12 +298,21 @@ function parseEventRows(records, headers, options) {
     const entity = entityCol && row[entityCol] !== "" && row[entityCol] != null
       ? String(row[entityCol])
       : "__all__";
+    const agentRaw = aiAgentCol ? String(row[aiAgentCol] ?? "").trim() : "";
+    const agent = !agentRaw || ["na", "nan", "null", "none", "false", "0"].includes(agentRaw.toLowerCase())
+      ? ""
+      : agentRaw;
     parsed.push({
       ts,
       entity,
       pattern,
       repo: repoCol ? String(row[repoCol] ?? "").trim() : "",
       event: githubEventColumn(headers) ? String(row[githubEventColumn(headers)] ?? "") : "",
+      isPullRequest: isPrCol ? parseBoolish(row[isPrCol]) : null,
+      aiParticipation: aiParticipationCol ? parseBoolish(row[aiParticipationCol]) : null,
+      aiAgent: agent,
+      username: usernameCol ? String(row[usernameCol] ?? "").trim() : "",
+      userType: userTypeCol ? String(row[userTypeCol] ?? "").trim() : "",
     });
   }
   if (!parsed.length) {
@@ -219,7 +340,7 @@ function parseEventRows(records, headers, options) {
     }
   }
 
-  return { parsed, byEntity, timeCol, entityCol, patternCol, repoCol };
+  return { parsed, byEntity, timeCol, entityCol, patternCol, repoCol, isPrCol };
 }
 
 function prOutcome(rows) {
@@ -228,6 +349,213 @@ function prOutcome(rows) {
   if (events.includes("closed")) return "closed";
   if (events.includes("head_ref_deleted")) return "deleted";
   return "open";
+}
+
+function countEventsAndTransitions(rows, directed) {
+  const eventCounts = new Map();
+  const transCounts = new Map();
+  for (const row of rows) {
+    eventCounts.set(row.pattern, (eventCounts.get(row.pattern) || 0) + 1);
+  }
+  for (let i = 0; i < rows.length - 1; i++) {
+    const a = rows[i].pattern;
+    const b = rows[i + 1].pattern;
+    if (a === b) continue;
+    const key = edgeKey(a, b, directed);
+    transCounts.set(key, (transCounts.get(key) || 0) + 1);
+  }
+  return { eventCounts, transCounts };
+}
+
+function aggregateProcessNodes(items, events, transitions, distanceMode) {
+  const byKey = new Map();
+  for (const item of items) {
+    if (!item.sequence.length) continue;
+    const key = item.sequence.join(" → ");
+    if (!byKey.has(key)) {
+      byKey.set(key, {
+        key,
+        sequence: item.sequence.slice(),
+        eventCounts: new Map(item.eventCounts),
+        transCounts: new Map(item.transCounts),
+        freq: 0,
+        ids: [],
+      });
+    }
+    const node = byKey.get(key);
+    node.freq += 1;
+    node.ids.push(item.id);
+  }
+  const nodes = [...byKey.values()];
+  if (!nodes.length) {
+    return { nodes: [], maxFreq: 1 };
+  }
+  for (const node of nodes) {
+    node.profile = [
+      ...events.map((e) => node.eventCounts.get(e) || 0),
+      ...transitions.map((e) => node.transCounts.get(e) || 0),
+    ];
+  }
+  let coords;
+  if (nodes.length === 1) {
+    coords = [[0, 0]];
+  } else if (nodes.length <= 280) {
+    const distances = pairwiseProcessDistances(
+      nodes.map((n) => ({ sequence: n.sequence, profile: n.profile })),
+      distanceMode
+    );
+    coords = classicalMds(distances);
+  } else {
+    coords = embedProfiles2D(nodes.map((n) => n.profile));
+  }
+  const maxFreq = nodes.reduce((m, n) => Math.max(m, n.freq), 1);
+  const nodeByKey = new Map(nodes.map((node, i) => [node.key, {
+    key: node.key,
+    sequence: node.sequence.join(" → "),
+    freq: node.freq,
+    ids: node.ids,
+    x: coords[i][0] || 0,
+    y: coords[i][1] || 0,
+  }]));
+  const points = [];
+  for (const item of items) {
+    if (!item.sequence.length) continue;
+    const key = item.sequence.join(" → ");
+    const node = nodeByKey.get(key);
+    if (!node) continue;
+    points.push({
+      id: item.id,
+      repo: item.repo || "",
+      outcome: item.outcome || "open",
+      isPullRequest: item.isPullRequest !== false,
+      startTs: item.startTs,
+      endTs: item.endTs,
+      aiAgent: item.aiAgent || "",
+      aiAppearTs: item.aiAppearTs,
+      processKey: key,
+      sequence: node.sequence,
+      freq: node.freq,
+      x: node.x,
+      y: node.y,
+    });
+  }
+  return {
+    nodes: [...nodeByKey.values()],
+    points,
+    maxFreq,
+  };
+}
+
+function countsFromSequence(seq, directed) {
+  const eventCounts = new Map();
+  const transCounts = new Map();
+  for (const step of seq) {
+    eventCounts.set(step, (eventCounts.get(step) || 0) + 1);
+  }
+  for (let i = 0; i < seq.length - 1; i++) {
+    const a = seq[i];
+    const b = seq[i + 1];
+    if (a === b) continue;
+    const key = edgeKey(a, b, directed);
+    transCounts.set(key, (transCounts.get(key) || 0) + 1);
+  }
+  return { eventCounts, transCounts };
+}
+
+function vocabFromItems(items, directed) {
+  const eventSet = new Set();
+  const transSet = new Set();
+  for (const item of items) {
+    const seq = item.sequence || [];
+    for (const step of seq) eventSet.add(step);
+    for (let i = 0; i < seq.length - 1; i++) {
+      if (seq[i] === seq[i + 1]) continue;
+      transSet.add(edgeKey(seq[i], seq[i + 1], directed));
+    }
+  }
+  return {
+    events: [...eventSet].sort(),
+    transitions: [...transSet].sort(),
+  };
+}
+
+function buildAiLandscapes(usedPrs, _events, _transitions, distanceMode, directed = true) {
+  const beforeItems = [];
+  const afterItems = [];
+  for (const pr of usedPrs) {
+    if (pr.aiAppearTs == null) continue;
+    const beforeSeq = pr.beforeSequence || pr.beforeSteps || [];
+    const afterSeq = pr.afterSequence || pr.afterSteps || [];
+    const beforeCounts = pr.beforeEventCounts
+      ? { eventCounts: pr.beforeEventCounts, transCounts: pr.beforeTransCounts || new Map() }
+      : countsFromSequence(beforeSeq, directed);
+    const afterCounts = pr.afterEventCounts
+      ? { eventCounts: pr.afterEventCounts, transCounts: pr.afterTransCounts || new Map() }
+      : countsFromSequence(afterSeq, directed);
+    beforeItems.push({
+      id: pr.id,
+      repo: pr.repo,
+      outcome: pr.outcome,
+      isPullRequest: pr.isPullRequest,
+      startTs: pr.startTs,
+      endTs: pr.endTs,
+      aiAgent: pr.aiAgent,
+      aiAppearTs: pr.aiAppearTs,
+      sequence: beforeSeq,
+      eventCounts: beforeCounts.eventCounts,
+      transCounts: beforeCounts.transCounts,
+    });
+    afterItems.push({
+      id: pr.id,
+      repo: pr.repo,
+      outcome: pr.outcome,
+      isPullRequest: pr.isPullRequest,
+      startTs: pr.startTs,
+      endTs: pr.endTs,
+      aiAgent: pr.aiAgent,
+      aiAppearTs: pr.aiAppearTs,
+      sequence: afterSeq,
+      eventCounts: afterCounts.eventCounts,
+      transCounts: afterCounts.transCounts,
+    });
+  }
+  const beforeVocab = vocabFromItems(beforeItems, directed);
+  const afterVocab = vocabFromItems(afterItems, directed);
+  const before = aggregateProcessNodes(beforeItems, beforeVocab.events, beforeVocab.transitions, distanceMode);
+  const after = aggregateProcessNodes(afterItems, afterVocab.events, afterVocab.transitions, distanceMode);
+  return {
+    before,
+    after,
+    nAiSplit: beforeItems.length,
+  };
+}
+
+function filterTracesForLandscape(traces, entityType = "both") {
+  return (traces || []).filter((t) => {
+    if (t.aiAppearTs == null) return false;
+    if (entityType === "pull_request" && !t.isPullRequest) return false;
+    if (entityType === "issue" && t.isPullRequest) return false;
+    return true;
+  });
+}
+
+function buildAiLandscapesForTraces(traces, options = {}) {
+  const directed = options.directed !== false;
+  const distanceMode = options.distanceMode || "both";
+  const entityType = options.entityType || "both";
+  const filtered = filterTracesForLandscape(traces, entityType).map((t) => ({
+    id: t.id,
+    repo: t.repo,
+    outcome: t.outcome,
+    isPullRequest: t.isPullRequest,
+    startTs: t.startTs,
+    endTs: t.endTs,
+    aiAgent: t.aiAgent,
+    aiAppearTs: t.aiAppearTs,
+    beforeSequence: t.beforeSteps || [],
+    afterSequence: t.afterSteps || [],
+  }));
+  return buildAiLandscapes(filtered, null, null, distanceMode, directed);
 }
 
 function edgeKey(a, b, directed) {
@@ -444,6 +772,19 @@ function buildPrEmbedding(records, headers, options) {
       ? Math.max(...terminal.map((r) => r.ts.getTime()))
       : rows[rows.length - 1].ts.getTime();
     const repo = rows.find((r) => r.repo)?.repo || "";
+    const ai = inferAiAppearance(rows);
+    let beforeSequence = [];
+    let afterSequence = [];
+    let beforeCounts = { eventCounts: new Map(), transCounts: new Map() };
+    let afterCounts = { eventCounts: new Map(), transCounts: new Map() };
+    if (ai.aiAppearTs != null) {
+      const beforeRows = rows.filter((r) => r.ts.getTime() < ai.aiAppearTs);
+      const afterRows = rows.filter((r) => r.ts.getTime() >= ai.aiAppearTs);
+      beforeSequence = collapseRuns(beforeRows.map((r) => r.pattern)).slice(0, 80);
+      afterSequence = collapseRuns(afterRows.map((r) => r.pattern)).slice(0, 80);
+      beforeCounts = countEventsAndTransitions(beforeRows, directed);
+      afterCounts = countEventsAndTransitions(afterRows, directed);
+    }
     prs.push({
       id,
       repo,
@@ -451,9 +792,18 @@ function buildPrEmbedding(records, headers, options) {
       endTs,
       nEvents: rows.length,
       outcome: prOutcome(rows),
+      isPullRequest: inferIsPullRequest(rows),
+      aiAgent: ai.aiAgent,
+      aiAppearTs: ai.aiAppearTs,
       eventCounts,
       transCounts,
       sequence: collapseRuns(rawSeq).slice(0, 80),
+      beforeSequence,
+      afterSequence,
+      beforeEventCounts: beforeCounts.eventCounts,
+      beforeTransCounts: beforeCounts.transCounts,
+      afterEventCounts: afterCounts.eventCounts,
+      afterTransCounts: afterCounts.transCounts,
     });
   }
 
@@ -498,6 +848,11 @@ function buildPrEmbedding(records, headers, options) {
     endTs: Math.max(pr.endTs, pr.startTs),
     nEvents: pr.nEvents,
     outcome: pr.outcome,
+    isPullRequest: pr.isPullRequest,
+    aiAgent: pr.aiAgent || "",
+    aiAppearTs: pr.aiAppearTs,
+    beforeSteps: (pr.beforeSequence || []).slice(),
+    afterSteps: (pr.afterSequence || []).slice(),
     sequence: pr.sequence.join(" → "),
     steps: pr.sequence.slice(),
     processKey: pr.sequence.join(" → "),
@@ -512,12 +867,15 @@ function buildPrEmbedding(records, headers, options) {
   const maxFreq = traces.reduce((m, t) => Math.max(m, t.freq), 1);
   const nRecurrentProcesses = [...freqBySeq.values()].filter((f) => f >= 2).length;
   const nRecurrentPrs = traces.filter((t) => t.freq >= 2).length;
+  const nAiPrs = traces.filter((t) => t.aiAppearTs != null).length;
+  const landscapes = buildAiLandscapes(usedPrs, events, transitions, distanceMode, directed);
 
   const tMin = Math.min(...traces.map((t) => t.startTs));
   const tMax = Math.max(...traces.map((t) => t.endTs));
 
   return {
     traces,
+    landscapes,
     featureNames,
     directed,
     distanceMode,
@@ -535,6 +893,7 @@ function buildPrEmbedding(records, headers, options) {
     maxFreq,
     nRecurrentProcesses,
     nRecurrentPrs,
+    nAiPrs,
     stress: quality.stress,
     meanAbsError: quality.meanAbsError,
     embedding: {
@@ -709,4 +1068,5 @@ export {
   parseCSV,
   inspectData,
   buildPrEmbedding,
+  buildAiLandscapesForTraces,
 };

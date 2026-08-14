@@ -140,6 +140,7 @@ label.file-btn:hover {
 }
 
 #freq-filter[hidden] { display: none; }
+#landscape-controls[hidden] { display: none; }
 
 .freq-hint {
   font-size: 9px;
@@ -161,12 +162,32 @@ label.file-btn:hover {
 
 #color-legend[hidden] { display: none; }
 
+.legend-outcome,
+.legend-pr {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.legend-outcome[hidden],
+.legend-pr[hidden] { display: none; }
+
 .legend-item {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 10px;
   letter-spacing: 1px;
+}
+
+.ai-legend {
+  opacity: 0.9;
+  margin: 2px 0 4px;
+}
+
+.swatch.ai-spark {
+  background: radial-gradient(circle, #fff 0%, #c9b6ff 45%, rgba(120, 100, 200, 0.15) 70%, transparent 75%);
+  box-shadow: 0 0 6px rgba(200, 180, 255, 0.55);
 }
 
 .swatch {
@@ -252,6 +273,24 @@ label.file-btn:hover {
   line-height: 1.35;
 }
 
+#view-title {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 11;
+  pointer-events: none;
+  text-align: center;
+  font-size: 18px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #c8fff8;
+  text-shadow: 0 0 10px #000, 0 0 18px #000;
+  white-space: nowrap;
+}
+
+#view-title[hidden] { display: none; }
+
 #labels-hud {
   position: absolute;
   bottom: 72px;
@@ -263,6 +302,40 @@ label.file-btn:hover {
   line-height: 1.6;
   letter-spacing: 1px;
 }
+
+#landscape-hud {
+  position: absolute;
+  top: 22%;
+  right: 24px;
+  z-index: 11;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 46%;
+  text-align: right;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+#landscape-hud[hidden] { display: none; }
+
+.land-hud-item .land-hud-kicker {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: #777;
+  margin-bottom: 4px;
+}
+
+.land-hud-item .land-hud-title {
+  font-size: 16px;
+  letter-spacing: 2px;
+  font-weight: bold;
+}
+
+.land-hud-item.before .land-hud-title { color: #66ffcc; }
+.land-hud-item.after .land-hud-title { color: #ffcc66; }
+
+.land-hud-item[hidden] { display: none; }
 
 #site-footer {
   position: absolute;
