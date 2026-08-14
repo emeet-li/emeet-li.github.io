@@ -18,3 +18,8 @@ Open http://localhost:8001/
 3. Press **Start**. Dots appear at creation time and grow upward until the PR ends.
 
 Color is creation time, or outcome (merged / closed / deleted / open).
+
+## Aknowledgement
+
+The webpage style follows https://github.com/DostoevskysPiano/bird-song
+
