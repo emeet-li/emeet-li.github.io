@@ -18,3 +18,8 @@ Open http://localhost:8001/
 3. Press **Start**. Dots appear at creation time and grow upward until the PR ends.
 
 Color is creation time, or outcome (merged / closed / deleted / open).
+
+## Acknowledgement 
+
+1, https://github.com/dora-ljh/literati-circle-graph for asthetics.
+2. vibe coding.
