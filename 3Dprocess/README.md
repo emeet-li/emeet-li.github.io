@@ -22,4 +22,5 @@ Color is creation time, or outcome (merged / closed / deleted / open).
 ## Acknowledgement 
 
 1, https://github.com/dora-ljh/literati-circle-graph for asthetics.
+
 2. vibe coding.
