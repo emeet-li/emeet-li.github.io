@@ -21,5 +21,6 @@ Color is creation time, or outcome (merged / closed / deleted / open).
 
 ## Acknowledgement 
 
-1. https://github.com/dora-ljh/literati-circle-graph for asthetics.
-2. vibe coding.
+1. refer to https://github.com/dora-ljh/literati-circle-graph for aesthetics (original inspiration: Aaron Koblin's flight pattern).
+2. refer to https://github.com/DostoevskysPiano/bird-song for some web design elements (original inspiration: Lucio Arese). 
+3. vibe coding.
